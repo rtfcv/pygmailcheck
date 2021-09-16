@@ -11,7 +11,15 @@ class PyNotify:
     lgr.setLevel(logging.INFO)
     # lgr.addHandler(logging.handlers.RotatingFileHandler('log.log'))
 
-    notify = None
+    def notify(self, AppID, title, text):
+        """Send a Notification
+        Keyword arguments:
+        AppID -- Name of the APP
+        title -- title of the notification
+        text -- body of the notification
+        """
+        # this is a dummy method that should be replaced during init
+        print('initializing seems to have failed')
 
     def __init__(self):
         if sys.platform == 'win32':
@@ -30,5 +38,35 @@ class PyNotify:
                 notifier.show(ToastNotification(XML))
 
             self.notify = toast_notification
+        elif sys.platform == 'linux':
+            import dbus
+
+            def linux_notify(AppID, title, text):
+                """Send a Notification
+                Keyword arguments:
+                AppID -- Name of the APP
+                title -- title of the notification
+                text -- body of the notification
+                """
+                bus_name = "org.freedesktop.Notifications"
+                object_path = "/org/freedesktop/Notifications"
+                interface = bus_name
+
+                notify = dbus.Interface(
+                    dbus.SessionBus().get_object(bus_name, object_path),
+                    interface
+                )
+
+                notify.Notify(
+                    AppID,       # app_name       (spec names)
+                    0,       # replaces_id
+                    '',     # app_icon
+                    title,  # summary
+                    text,  # body
+                    '',  # actions
+                    '',    # hints
+                    -1,  # expire_timeout
+                )
+            self.notify = linux_notify
         else:
-            print(sys.platform)
+            print(f'The platform= {sys.platform} is not supported by pyNotify')
