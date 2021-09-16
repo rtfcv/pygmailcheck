@@ -8,6 +8,9 @@ import pandas as pd
 import time
 import sys
 import pyNotify
+import inspect
+import json
+from pprint import pprint
 
 ###############
 # TODO
@@ -28,34 +31,42 @@ def main():
     #     creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     service = {}
     users = ['one', 'two']
+    creds = {}
 
     for user in users:
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        creds = None
+        creds[user] = None
+
+        token_fname = user+'token.json'
 
         # create add_user switch
-        if os.path.exists(user+'token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if os.path.exists(token_fname):
+            creds[user] = Credentials\
+                .from_authorized_user_file(token_fname, SCOPES)
         # If there are no (valid) credentials available, let the user log in.
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+        if not creds[user] or not creds[user].valid:
+            if creds[user] and\
+                    creds[user].expired and creds[user].refresh_token:
+                creds[user].refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     'credentials.json',
                     SCOPES
                 )
-                creds = flow.run_local_server(port=0)
+                creds[user] = flow.run_local_server(port=0, open_browser=False)
 
             # Save the credentials for the next run
-            with open(user+'token.json', 'w') as token:
-                token.write(creds.to_json())
-        # Later create multiple files for token                      ##############
+            with open(token_fname, 'w') as token:
+                token.write(creds[user].to_json())
 
         # instanciate stuffs
-        service[user] = build('gmail', 'v1', credentials=creds)
+        service[user] = build('gmail', 'v1', credentials=creds[user])
+
+    # credict = json.loads(creds['one'].to_json())
+    # pprint(credict)
+    # creds['one'] = Credentials.from_authorized_user_info(credict)
 
     notify = pyNotify.PyNotify()
 
@@ -66,11 +77,16 @@ def main():
     while True:
         for user in users:
             try:
-                results = service[user].users().messages().list(userId='me').execute()
+                results = service[user].users()\
+                    .messages().list(userId='me').execute()
             except BaseException as e:
                 print(e)
-                service = build('gmail', 'v1', credentials=creds)
-                results = service[user].users().messages().list(userId='me').execute()
+                service = build('gmail', 'v1', credentials=creds[user])
+                results = service[user].users()\
+                    .messages().list(userId='me').execute()
+
+            addr = service[user].users()\
+                .getProfile(userId='me').execute()['emailAddress']
 
             mesgs = results.get('messages', [])
             newDF[user] = pd.DataFrame(mesgs).set_index('id', drop=True)
@@ -80,7 +96,8 @@ def main():
             newMail = newDF[user][~newDF[user].isin(oldDF[user])].dropna()
 
             for _id in newMail.index:
-                txt = service[user].users().messages().get(userId='me', id=_id).execute()
+                txt = service[user].users()\
+                    .messages().get(userId='me', id=_id).execute()
 
                 # Use try-except to avoid any Errors
                 try:
@@ -100,12 +117,12 @@ def main():
                             sender = d['value']
 
                     # Printing the subject, sender's email and message
-                    print(f'User: {user}')
+                    print(f'User {user}: {addr}')
                     print(f'Subject: {subject}')
                     print(f'From: {sender}')
                     print('\n')
 
-                    notify.notify('gmail', user, sender + '\n' +subject)
+                    notify.notify('gmail', addr, sender + '\n' + subject)
 
                 except BaseException as e:
                     print(e)
