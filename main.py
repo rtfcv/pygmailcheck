@@ -21,14 +21,67 @@ from pprint import pprint
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
+# config dict
+# top level keys represent a user
+#
+auth = None
+config_dir = ''
+auth_path = ''
+
+
+def load_config():
+    global auth
+    global config_dir
+    global auth_path
+
+    __platform__ = sys.platform
+    if __platform__ == 'win32':
+        HOME = os.environ.get('HOMEPATH')
+        config_dir = os.path.join(HOME, r'AppData\Roaming\pyGmailCheck')
+        auth_path = os.path.join(config_dir, 'userdata.json')
+
+    elif __platform__ == 'linux':
+        HOME = os.environ.get('HOME')
+        config_dir = os.path.join(HOME, '.config/pyGmailCheck')
+        auth_path = os.path.join(config_dir, 'userdata.json')
+
+    else:
+        print(f'Platform {__platform__} not supported')
+
+    # try to load config
+    try:
+        with open(auth_path, mode='r') as file:
+            auth = json.load(file)
+    except FileNotFoundError:
+        auth = {}
+
+
+def save_config():
+    # global config
+    # global config_dir
+    # global config_path
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir, exist_ok=True)
+
+    with open(auth_path, mode='w') as file:
+        json.dump(auth, file, indent=2)
+
 
 def load_credentials():
     """Returns Dictionary of credential objects
     key: user ID(internal)
     value: credential obj
     """
-    users = ['1', '2', '3']
+    global auth
+    load_config()
+
+    users = list(auth.keys())
     creds = {}
+
+    if len(users) == 0:
+        users = [1, 2, 3]
+        for user in users:
+            auth[user] = {}
 
     # how to convert json to dict
     # credict = json.loads(creds['one'].to_json())
@@ -44,9 +97,10 @@ def load_credentials():
         token_fname = user+'token.json'
 
         # create add_user switch
-        if os.path.exists(token_fname):
+        if 'token' in auth[user].keys():
             creds[user] = Credentials\
-                .from_authorized_user_file(token_fname, SCOPES)
+                .from_authorized_user_info(auth[user]['token'], SCOPES)
+
         # If there are no (valid) credentials available, let the user log in.
         if not creds[user] or not creds[user].valid:
             if creds[user] and\
@@ -60,9 +114,9 @@ def load_credentials():
                 creds[user] = flow.run_local_server(port=0, open_browser=False)
 
             # Save the credentials for the next run
-            with open(token_fname, 'w') as token:
-                token.write(creds[user].to_json())
+            auth[user]['token'] = json.loads(creds[user].to_json())
 
+    save_config()
     return creds
 
 
@@ -70,6 +124,7 @@ def main():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
     """
+    global auth
 
     creds = load_credentials()
     users = list(creds.keys())
@@ -78,6 +133,16 @@ def main():
     service = {}
     for user in users:
         service[user] = build('gmail', 'v1', credentials=creds[user])
+
+    # TODO:
+    # temporary measure
+    # remove this and put similar procedure
+    load_config()
+    for user in users:
+        addr = service[user].users()\
+            .getProfile(userId='me').execute()['emailAddress']
+        auth[user]['email'] = addr
+    save_config()
 
     notify = pyNotify.PyNotify()
 
@@ -134,7 +199,7 @@ def main():
                     print(f'Subject: {subject}')
                     print(f'From: {sender}')
                     print('\n')
-
+                    # send notification
                     notify.notify('gmail', addr, sender + '\n' + subject)
 
                 except BaseException as e:
@@ -142,7 +207,6 @@ def main():
                     pass
 
             oldDF[user] = newDF[user]
-
             # repeat the above process for multiple users
 
         try:
