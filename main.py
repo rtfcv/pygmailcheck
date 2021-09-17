@@ -160,7 +160,7 @@ def main():
                     .messages().list(userId='me').execute()
             except BaseException as e:
                 print(e)
-                service = build('gmail', 'v1', credentials=creds[user])
+                service[user] = build('gmail', 'v1', credentials=creds[user])
                 results = service[user].users()\
                     .messages().list(userId='me').execute()
 
