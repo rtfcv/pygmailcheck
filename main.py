@@ -8,6 +8,7 @@ import pandas as pd
 import time
 import sys
 import pyNotify
+
 import inspect
 import json
 from pprint import pprint
@@ -21,22 +22,23 @@ from pprint import pprint
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
 
-def main():
-    """Shows basic usage of the Gmail API.
-    Lists the user's Gmail labels.
+def load_credentials():
+    """Returns Dictionary of credential objects
+    key: user ID(internal)
+    value: credential obj
     """
-
-    # user = 'example'
-    # if os.path.exists(+'example/token.json'):
-    #     creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    service = {}
     users = ['1', '2', '3']
     creds = {}
 
+    # how to convert json to dict
+    # credict = json.loads(creds['one'].to_json())
+    # pprint(credict)
+    # creds['one'] = Credentials.from_authorized_user_info(credict)
+
     for user in users:
-        # The file token.json stores the user's access and refresh tokens, and is
-        # created automatically when the authorization flow completes for the first
-        # time.
+        # The file token.json stores the user's access and refresh tokens,
+        # and is created automatically when the authorization flow completes
+        # for the first time.
         creds[user] = None
 
         token_fname = user+'token.json'
@@ -61,12 +63,21 @@ def main():
             with open(token_fname, 'w') as token:
                 token.write(creds[user].to_json())
 
-        # instanciate stuffs
-        service[user] = build('gmail', 'v1', credentials=creds[user])
+    return creds
 
-    # credict = json.loads(creds['one'].to_json())
-    # pprint(credict)
-    # creds['one'] = Credentials.from_authorized_user_info(credict)
+
+def main():
+    """Shows basic usage of the Gmail API.
+    Lists the user's Gmail labels.
+    """
+
+    creds = load_credentials()
+    users = list(creds.keys())
+
+    # instanciate stuffs
+    service = {}
+    for user in users:
+        service[user] = build('gmail', 'v1', credentials=creds[user])
 
     notify = pyNotify.PyNotify()
 
@@ -85,12 +96,14 @@ def main():
                 results = service[user].users()\
                     .messages().list(userId='me').execute()
 
+            # email address of user
             addr = service[user].users()\
                 .getProfile(userId='me').execute()['emailAddress']
 
             mesgs = results.get('messages', [])
             newDF[user] = pd.DataFrame(mesgs).set_index('id', drop=True)
 
+            # define newMail: mails not present in oldDF but is in newDF
             if not (user in oldDF.keys()):
                 oldDF[user] = newDF[user]
             newMail = newDF[user][~newDF[user].isin(oldDF[user])].dropna()
