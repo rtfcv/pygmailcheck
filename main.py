@@ -30,7 +30,7 @@ def main():
     # if os.path.exists(+'example/token.json'):
     #     creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     service = {}
-    users = ['one', 'two']
+    users = ['1', '2', '3']
     creds = {}
 
     for user in users:
