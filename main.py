@@ -78,8 +78,9 @@ def load_credentials():
     users = list(auth.keys())
     creds = {}
 
+    # temporary measures to make 3 new users if the auth is empty
     if len(users) == 0:
-        users = [1, 2, 3]
+        users = ["1", "2", "3"]
         for user in users:
             auth[user] = {}
 
