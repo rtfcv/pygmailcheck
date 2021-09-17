@@ -94,8 +94,6 @@ def load_credentials():
         # for the first time.
         creds[user] = None
 
-        token_fname = user+'token.json'
-
         # create add_user switch
         if 'token' in auth[user].keys():
             creds[user] = Credentials\
@@ -116,6 +114,15 @@ def load_credentials():
             # Save the credentials for the next run
             auth[user]['token'] = json.loads(creds[user].to_json())
 
+            __serv = build('gmail', 'v1', credentials=creds[user])
+            __addr = __serv.users().getProfile(userId='me')\
+                .execute()['emailAddress']
+            auth[user]['email'] = __addr
+            __serv.close()
+
+            if user != __addr:
+                auth[__addr] = auth.pop(user)
+                creds[__addr] = creds.pop(user)
     save_config()
     return creds
 
@@ -129,16 +136,11 @@ def main():
     creds = load_credentials()
     users = list(creds.keys())
 
-    # instanciate stuffs
+    # instanciate services
     service = {}
-    for user in users:
-        service[user] = build('gmail', 'v1', credentials=creds[user])
-
-    # TODO:
-    # temporary measure
-    # remove this and put similar procedure
     load_config()
     for user in users:
+        service[user] = build('gmail', 'v1', credentials=creds[user])
         addr = service[user].users()\
             .getProfile(userId='me').execute()['emailAddress']
         auth[user]['email'] = addr
