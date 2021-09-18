@@ -11,7 +11,7 @@ def log():
     """
 
 
-def enableLog(fname, print=True):
+def enableLog(fname, do_print=True):
     """Enable Logging
     Parameter:
     fname: Path of Logfile
@@ -22,7 +22,7 @@ def enableLog(fname, print=True):
     _log.setLevel(logging.INFO)
     _log.info(time.ctime() + ': ' + 'started logging')
 
-    def log(str, print=print):
+    def log(str, do_print=do_print):
         """Write to Logfile
         Log Level is Info for now
         Parameter:
