@@ -7,11 +7,13 @@ from google.oauth2.credentials import Credentials
 import pandas as pd
 import time
 import sys
-import pyNotify
 
 import inspect
 import json
 from pprint import pprint
+
+import pyNotify
+import mylog
 
 ###############
 # TODO
@@ -29,8 +31,7 @@ config_dir = ''
 auth_path = ''
 
 
-def load_config():
-    global auth
+def load_paths():
     global config_dir
     global auth_path
 
@@ -47,6 +48,12 @@ def load_config():
 
     else:
         print(f'Platform {__platform__} not supported')
+
+
+def load_config():
+    global auth
+
+    load_paths()
 
     # try to load config
     try:
@@ -105,6 +112,7 @@ def load_credentials():
             if creds[user] and\
                     creds[user].expired and creds[user].refresh_token:
                 creds[user].refresh(Request())
+                mylog.log(f'refreshing token for {user}')
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     'credentials.json',
@@ -134,6 +142,9 @@ def main():
     """
     global auth
 
+    load_paths()
+    mylog.enableLog(os.path.join(config_dir, 'mylog.log'))
+
     creds = load_credentials()
     users = list(creds.keys())
 
@@ -159,7 +170,8 @@ def main():
                 results = service[user].users()\
                     .messages().list(userId='me').execute()
             except BaseException as e:
-                print(e)
+                mylog.log(str(e))
+
                 service[user] = build('gmail', 'v1', credentials=creds[user])
                 results = service[user].users()\
                     .messages().list(userId='me').execute()
@@ -186,7 +198,7 @@ def main():
                     payload = txt['payload']
                     headers = payload['headers']
                 except BaseException as e:
-                    print(e)
+                    mylog.log(str(e))
                     continue
 
                 try:
@@ -206,7 +218,7 @@ def main():
                     notify.notify('gmail', addr, sender + '\n' + subject)
 
                 except BaseException as e:
-                    print(e)
+                    mylog.log(str(e))
                     pass
 
             oldDF[user] = newDF[user]
