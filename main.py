@@ -136,6 +136,41 @@ def load_credentials():
     return creds
 
 
+def deal_with_new_mails(newMail, user, service, notify):
+    for _id in newMail.index:
+        txt = service[user].users()\
+            .messages().get(userId='me', id=_id).execute()
+
+        # Use try-except to avoid any Errors
+        try:
+            # Get value of 'payload' from dictionary 'txt'
+            payload = txt['payload']
+            headers = payload['headers']
+        except BaseException as e:
+            mylog.log(str(e))
+            continue
+
+        try:
+            # Look for Subject and Sender Email in the headers
+            for d in headers:
+                if d['name'] == 'Subject':
+                    subject = d['value']
+                if d['name'] == 'From':
+                    sender = d['value']
+
+            # Printing the subject, sender's email and message
+            print(f'User: {user}')
+            print(f'Subject: {subject}')
+            print(f'From: {sender}')
+            print('\n')
+            # send notification
+            notify.notify('gmail', user, sender + '\n' + subject)
+
+        except BaseException as e:
+            mylog.log(user + ': ' + str(e))
+            pass
+
+
 def main():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
@@ -180,6 +215,7 @@ def main():
             addr = service[user].users()\
                 .getProfile(userId='me').execute()['emailAddress']
 
+            # get new message and set index as id column, drop old index
             mesgs = results.get('messages', [])
             newDF[user] = pd.DataFrame(mesgs).set_index('id', drop=True)
 
@@ -188,38 +224,13 @@ def main():
                 oldDF[user] = newDF[user]
             newMail = newDF[user][~newDF[user].isin(oldDF[user])].dropna()
 
-            for _id in newMail.index:
-                txt = service[user].users()\
-                    .messages().get(userId='me', id=_id).execute()
-
-                # Use try-except to avoid any Errors
-                try:
-                    # Get value of 'payload' from dictionary 'txt'
-                    payload = txt['payload']
-                    headers = payload['headers']
-                except BaseException as e:
-                    mylog.log(str(e))
-                    continue
-
-                try:
-                    # Look for Subject and Sender Email in the headers
-                    for d in headers:
-                        if d['name'] == 'Subject':
-                            subject = d['value']
-                        if d['name'] == 'From':
-                            sender = d['value']
-
-                    # Printing the subject, sender's email and message
-                    print(f'User {user}: {addr}')
-                    print(f'Subject: {subject}')
-                    print(f'From: {sender}')
-                    print('\n')
-                    # send notification
-                    notify.notify('gmail', addr, sender + '\n' + subject)
-
-                except BaseException as e:
-                    mylog.log(str(e))
-                    pass
+            # invoke notification for every new mail
+            deal_with_new_mails(
+                newMail=newMail,
+                user=user,
+                service=service,
+                notify=notify
+            )
 
             oldDF[user] = newDF[user]
             # repeat the above process for multiple users
